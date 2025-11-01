@@ -165,7 +165,7 @@ const ReportsPage: React.FC = () => {
         }, {} as Record<string, number>);
 
         const popularServices = Object.entries(serviceCounts)
-            .map(([label, value]) => ({ label, value }))
+            .map(([label, value]) => ({ label, value: Number(value) }))
             .sort((a, b) => b.value - a.value);
 
         // Chart Data: Staff Performance
@@ -179,7 +179,7 @@ const ReportsPage: React.FC = () => {
         }, {} as Record<string, number>);
 
         const staffPerformance = Object.entries(staffRevenue)
-            .map(([label, value]) => ({ label, value }))
+            .map(([label, value]) => ({ label, value: Number(value) }))
             .sort((a, b) => b.value - a.value);
 
         // Chart Data: Revenue Over Time
@@ -202,7 +202,7 @@ const ReportsPage: React.FC = () => {
         }, {} as Record<string, number>);
 
         const clientAcquisitionData = Object.entries(clientSources)
-            .map(([label, value]) => ({ label, value }))
+            .map(([label, value]) => ({ label, value: Number(value) }))
             .sort((a, b) => b.value - a.value);
             
         // Chart Data: Service Profitability
@@ -220,7 +220,7 @@ const ReportsPage: React.FC = () => {
         }, {} as Record<string, number>);
         
         const serviceProfitability = Object.entries(serviceProfits)
-            .map(([label, value]) => ({ label, value }))
+            .map(([label, value]) => ({ label, value: Number(value) }))
             .sort((a, b) => b.value - a.value);
 
         return {
