@@ -1,0 +1,7 @@
+{
+  "name": "Glamoir - Salon Management System",
+  "description": "A comprehensive multi-tenant beauty parlor management system with client management, staff scheduling, and appointment booking. Features a feminine-themed design with a rose and lavender color palette.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
