@@ -1,10 +1,20 @@
 import React, { useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DataContext } from '../App';
 import { MOCK_TENANTS } from '../constants';
 
 const LandingPage: React.FC = () => {
+    const navigate = useNavigate();
     const { tenants, setCurrentTenantId } = useContext(DataContext);
     const displayServices = MOCK_TENANTS[0]?.services || [];
+
+    const handleSignIn = () => {
+        // Set the first tenant as current (or you can implement proper authentication)
+        if (tenants.length > 0) {
+            setCurrentTenantId(tenants[0].id);
+            navigate('/dashboard');
+        }
+    };
 
     const handleEnterDashboard = (tenantId: string) => {
         setCurrentTenantId(tenantId);
@@ -16,22 +26,19 @@ const LandingPage: React.FC = () => {
             <div className="relative h-screen flex items-center justify-center text-white text-center px-4" style={{ backgroundImage: "url('https://source.unsplash.com/1920x1080/?flowers,floral,beauty')", backgroundSize: 'cover', backgroundPosition: 'center' }}>
                 <div className="absolute inset-0 bg-gradient-to-r from-rose-pink/70 to-lavender-purple/70"></div>
                 <div className="relative z-10">
-                    <h1 className="text-5xl md:text-7xl font-bold mb-4" style={{fontFamily: "'Playfair Display', serif"}}>Welcome to Glamoir</h1>
-                    <p className="text-lg md:text-2xl mb-8 max-w-3xl mx-auto">The all-in-one management solution for your beauty parlor. Streamline bookings, manage clients, and empower your staff.</p>
+                    <img src="https://sopkcpmuhwktnrkbgabx.supabase.co/storage/v1/object/sign/Logo/GenZ%20salon%20logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV80MDY0MDM1OC1mYWIwLTRlN2MtYmExNy0yYTZjZDc1N2UwNTAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJMb2dvL0dlblogc2Fsb24gbG9nby5wbmciLCJpYXQiOjE3NjIwMDg3OTIsImV4cCI6MTg0ODQwODc5Mn0._eh1bvBGE3w5fAnZxsNAEAgJWIZbLo8PnjHEAESmwF0" alt="GenZ Salon Logo" className="w-30.4 h-30.4 mx-auto mb-4 rounded-full" />
+                    <h1 className="text-5xl md:text-7xl font-bold mb-4" style={{fontFamily: "'Playfair Display', serif"}}>Welcome to GenZ Salon</h1>
+                    <p className="text-lg md:text-2xl mb-8 max-w-3xl mx-auto">The all-in-one management solution for your beauty salon. Streamline bookings, manage clients, and empower your staff with modern technology.</p>
                     <div className="bg-white/20 backdrop-blur-sm p-6 rounded-xl shadow-lg">
-                        <h2 className="text-2xl font-semibold mb-4 text-white">Select Your Salon to Begin</h2>
-                        <div className="flex flex-col md:flex-row gap-4 justify-center">
-                            {tenants.map(tenant => (
-                                <button
-                                    key={tenant.id}
-                                    onClick={() => handleEnterDashboard(tenant.id)}
-                                    className="px-8 py-3 bg-white text-rose-pink font-semibold rounded-lg shadow-md hover:bg-light-pink transition-all duration-300 transform hover:scale-105"
-                                >
-                                    Enter {tenant.name}
-                                </button>
-                            ))}
+                        <div className="flex justify-center">
+                            <button
+                                onClick={handleSignIn}
+                                className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-lg shadow-md hover:from-purple-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105"
+                            >
+                                Sign In
+                            </button>
                         </div>
-                         <p className="mt-4 text-sm text-white/80">This is a test environment. Select a salon to access its dashboard.</p>
+                          <p className="mt-4 text-sm text-white/80">Welcome to your beauty salon management system</p>
                     </div>
                 </div>
             </div>
@@ -78,7 +85,7 @@ const LandingPage: React.FC = () => {
              {/* Footer */}
             <footer className="bg-gray-800 text-white py-8">
                 <div className="container mx-auto text-center">
-                    <p>&copy; {new Date().getFullYear()} Glamoir. All rights reserved.</p>
+                    <p>&copy; {new Date().getFullYear()} GenZ Salon. All rights reserved.</p>
                 </div>
             </footer>
         </div>

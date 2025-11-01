@@ -13,6 +13,12 @@ import InventoryPage from './pages/InventoryPage';
 import ServicesPage from './pages/ServicesPage';
 import ReportsPage from './pages/ReportsPage';
 import MarketingPage from './pages/MarketingPage';
+import AccountingDashboardPage from './pages/AccountingDashboardPage';
+import SalesRegisterPage from './pages/SalesRegisterPage';
+import ExpenseRegisterPage from './pages/ExpenseRegisterPage';
+import AccountsReceivablePage from './pages/AccountsReceivablePage';
+import AccountsPayablePage from './pages/AccountsPayablePage';
+import PayrollPage from './pages/PayrollPage';
 import Toast from './components/Toast';
 
 export const DataContext = React.createContext<{
@@ -148,6 +154,12 @@ const App: React.FC = () => {
                             <Route path="marketing" element={<MarketingPage />} />
                             <Route path="services" element={<ServicesPage />} />
                             <Route path="reports" element={<ReportsPage />} />
+                            <Route path="accounting" element={<AccountingDashboardPage />} />
+                            <Route path="accounting/sales" element={<SalesRegisterPage />} />
+                            <Route path="accounting/expenses" element={<ExpenseRegisterPage />} />
+                            <Route path="accounting/receivables" element={<AccountsReceivablePage />} />
+                            <Route path="accounting/payables" element={<AccountsPayablePage />} />
+                            <Route path="accounting/payroll" element={<PayrollPage />} />
                         </Route>
                     </Routes>
                 </div>
