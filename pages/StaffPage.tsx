@@ -1,4 +1,4 @@
-import React, { useState, useContext, useMemo } from 'react';
+import React, { useState, useContext, useMemo, useEffect } from 'react';
 import { DataContext } from '../App';
 import Modal from '../components/Modal';
 import { Staff, StaffRole, Appointment, StaffSchedule } from '../types';
@@ -462,6 +462,33 @@ const StaffPage: React.FC = () => {
     const [schedulingStaff, setSchedulingStaff] = useState<Staff | undefined>(undefined);
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
+    const [loading, setLoading] = useState(true);
+
+    // Fetch staff data from backend on component mount
+    useEffect(() => {
+        const fetchStaffData = async () => {
+            if (!currentTenant) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`http://localhost:3002/api/staff/${currentTenant.id}`);
+                if (!response.ok) throw new Error('Failed to fetch staff data');
+
+                const staffData = await response.json();
+                // Update the tenant data with the fetched staff
+                updateTenantData(currentTenant.id, { staff: staffData });
+            } catch (error) {
+                console.error('Error fetching staff data:', error);
+                addToast('Failed to load staff data', 'error');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStaffData();
+    }, [currentTenant?.id, updateTenantData, addToast]);
 
     const handleSaveStaff = async (staffData: Omit<Staff, 'id'> | Staff) => {
         if (!currentTenant) return;

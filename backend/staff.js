@@ -3,6 +3,27 @@ const supabase = require('./db');
 
 const router = express.Router();
 
+// Convert DB snake_case fields into the camelCase shape the frontend expects
+const mapStaffRow = (row) => ({
+  id: row.id,
+  tenantId: row.tenant_id,
+  name: row.name,
+  email: row.email,
+  phone: row.phone,
+  role: row.role,
+  yearsOfExperience: row.years_of_experience,
+  commission: row.commission,
+  profile_image_url: row.profile_image_url,
+  rating: row.rating,
+  bio: row.bio,
+  specializations: row.specializations || [],
+  isActive: row.is_active,
+  schedule: row.schedule,
+  identity: row.identity,
+  salary: row.salary,
+  createdAt: row.created_at,
+});
+
 // Get all staff for a tenant
 router.get('/:tenantId', async (req, res) => {
   try {
@@ -14,7 +35,7 @@ router.get('/:tenantId', async (req, res) => {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json(data);
+    res.json((data || []).map(mapStaffRow));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -50,7 +71,7 @@ router.post('/', async (req, res) => {
       .single();
 
     if (error) throw error;
-    res.status(201).json(data);
+    res.status(201).json(mapStaffRow(data));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -86,7 +107,7 @@ router.put('/:id', async (req, res) => {
       .single();
 
     if (error) throw error;
-    res.json(data);
+    res.json(mapStaffRow(data));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

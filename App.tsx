@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { TenantData, ToastMessage, AppNotification, Product } from './types';
 import { MOCK_TENANTS } from './constants';
@@ -43,6 +43,8 @@ const App: React.FC = () => {
     const [currentTenantData, setCurrentTenantData] = useState<TenantData | null>(null);
     const [toasts, setToasts] = useState<ToastMessage[]>([]);
     const [loading, setLoading] = useState(true);
+    const notifSignatureRef = useRef<string>('');
+    const lastUpdateSignatureRef = useRef<Map<string, string>>(new Map());
 
     // Fetch tenants from API on mount
     useEffect(() => {
@@ -83,22 +85,28 @@ const App: React.FC = () => {
             }
         };
         fetchCurrentTenantData();
-    }, [currentTenantId, tenantsData]);
+    }, [currentTenantId]); // Removed tenantsData to prevent infinite loop
 
     const setCurrentTenantId = useCallback((id: string) => {
         setCurrentTenantIdState(id);
     }, []);
 
     const updateTenantData = useCallback(async (tenantId: string, updatedData: Partial<TenantData>) => {
+        const signature = JSON.stringify(updatedData);
+        const lastSignature = lastUpdateSignatureRef.current.get(tenantId);
+
+        // Skip if this exact payload was just sent to avoid tight PUT loops
+        if (lastSignature === signature) {
+            return;
+        }
+        lastUpdateSignatureRef.current.set(tenantId, signature);
+
         try {
             await api.updateTenant(tenantId, updatedData);
-            setTenantsData(prev => prev.map(tenant =>
-                tenant.id === tenantId ? { ...tenant, ...updatedData } : tenant
-            ));
-            setCurrentTenantData(prev => prev ? { ...prev, ...updatedData } : null);
         } catch (error) {
             console.error('Failed to update tenant:', error);
-            // Still update locally if API fails
+        } finally {
+            // Always update local cache so UI stays in sync even if the PUT fails
             setTenantsData(prev => prev.map(tenant =>
                 tenant.id === tenantId ? { ...tenant, ...updatedData } : tenant
             ));
@@ -177,12 +185,22 @@ const App: React.FC = () => {
         // Compare with current notifications to prevent infinite render loops
         const currentNotifString = JSON.stringify((currentTenant.notifications || []).map(n => ({id: n.id, message: n.message})).sort((a,b) => a.id.localeCompare(b.id)));
         const finalNotifString = JSON.stringify(finalNotifications.map(n => ({id: n.id, message: n.message})).sort((a,b) => a.id.localeCompare(b.id)));
-        
-        if (currentNotifString !== finalNotifString) {
-             updateTenantData(currentTenant.id, { notifications: finalNotifications });
+
+        // Prevent repeated PUTs: if the computed notifications haven't changed, stop here.
+        if (finalNotifString === notifSignatureRef.current || currentNotifString === finalNotifString) {
+            return;
         }
 
-    }, [currentTenant, updateTenantData]);
+        // Cache the signature so subsequent renders skip the update.
+        notifSignatureRef.current = finalNotifString;
+
+        // Update local state without hitting the tenant PUT endpoint.
+        setTenantsData(prev => prev.map(tenant =>
+            tenant.id === currentTenant.id ? { ...tenant, notifications: finalNotifications } : tenant
+        ));
+        setCurrentTenantData(prev => prev ? { ...prev, notifications: finalNotifications } : null);
+
+    }, [currentTenant]);
 
 
     const contextValue = useMemo(() => ({

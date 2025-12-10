@@ -2,6 +2,14 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const supabase = require("./db");
+const { createClient } = require("@supabase/supabase-js");
+require("dotenv").config();
+
+// Create a separate Supabase client with service role key for storage operations
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 const router = express.Router();
 
@@ -37,8 +45,8 @@ router.post("/image", upload.single("image"), async (req, res) => {
     const fileExt = path.extname(req.file.originalname);
     const fileName = `staff-${Date.now()}-${Math.random().toString(36).substring(2)}${fileExt}`;
 
-    // Upload to Supabase storage
-    const { data, error } = await supabase.storage
+    // Upload to Supabase storage using admin client
+    const { data, error } = await supabaseAdmin.storage
       .from("staff images")
       .upload(fileName, req.file.buffer, {
         contentType: req.file.mimetype,
@@ -52,8 +60,8 @@ router.post("/image", upload.single("image"), async (req, res) => {
         .json({ error: "Failed to upload image to storage" });
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
+    // Get public URL using admin client
+    const { data: urlData } = supabaseAdmin.storage
       .from("staff images")
       .getPublicUrl(fileName);
 

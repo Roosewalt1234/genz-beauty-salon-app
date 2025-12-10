@@ -89,7 +89,7 @@ export const MOCK_TENANTS: TenantData[] = [
         specializations: ['Haircut', 'Hair Coloring'],
         isActive: true,
         schedule: DEFAULT_SCHEDULE,
-        profileImageUrl: 'https://images.unsplash.com/photo-1557053910-d9eadeed1c58?w=200&h=200&fit=crop&q=80'
+        profile_image_url: 'https://images.unsplash.com/photo-1557053910-d9eadeed1c58?w=200&h=200&fit=crop&q=80'
       },
       {
         id: 'st2',
@@ -100,7 +100,7 @@ export const MOCK_TENANTS: TenantData[] = [
         specializations: ['Facial', 'Waxing'],
         isActive: true,
         schedule: DEFAULT_SCHEDULE,
-        profileImageUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop&q=80'
+        profile_image_url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop&q=80'
       },
       {
         id: 'st3',
@@ -111,7 +111,7 @@ export const MOCK_TENANTS: TenantData[] = [
         specializations: ['Manicure', 'Pedicure'],
         isActive: false,
         schedule: DEFAULT_SCHEDULE,
-        profileImageUrl: 'https://images.unsplash.com/photo-1607957159143-de3859adca2d?w=200&h=200&fit=crop&q=80'
+        profile_image_url: 'https://images.unsplash.com/photo-1607957159143-de3859adca2d?w=200&h=200&fit=crop&q=80'
       }
     ],
     services: [

@@ -4,7 +4,7 @@ const path = require("path");
 const supabase = require("./db");
 require("dotenv").config();
 
-let authRoutes, uploadRoutes, staffRoutes, clientRoutes;
+let authRoutes, uploadRoutes, staffRoutes, clientRoutes, staffProfileRoutes;
 try {
   authRoutes = require("./auth");
   console.log("✅ Auth routes loaded");
@@ -24,6 +24,13 @@ try {
   console.log("✅ Staff routes loaded");
 } catch (err) {
   console.error("❌ Failed to load staff routes:", err.message);
+}
+
+try {
+  staffProfileRoutes = require("./staff_profile");
+  console.log("✅ Staff profile routes loaded");
+} catch (err) {
+  console.error("❌ Failed to load staff profile routes:", err.message);
 }
 
 try {
@@ -50,6 +57,9 @@ if (uploadRoutes) app.use("/api/upload", uploadRoutes);
 
 // Staff routes
 if (staffRoutes) app.use("/api/staff", staffRoutes);
+
+// Staff profile routes
+if (staffProfileRoutes) app.use("/api/staff", staffProfileRoutes);
 
 // Client routes
 if (clientRoutes) app.use("/api/clients", clientRoutes);
