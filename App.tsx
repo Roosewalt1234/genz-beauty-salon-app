@@ -3,7 +3,6 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { TenantData, ToastMessage, AppNotification, Product } from './types';
 import { MOCK_TENANTS } from './constants';
-import { api } from './api';
 import LandingPage from './pages/LandingPage';
 import SignInPage from './pages/SignInPage';
 import DashboardLayout from './pages/DashboardLayout';
@@ -44,74 +43,33 @@ const App: React.FC = () => {
     const [toasts, setToasts] = useState<ToastMessage[]>([]);
     const [loading, setLoading] = useState(true);
     const notifSignatureRef = useRef<string>('');
-    const lastUpdateSignatureRef = useRef<Map<string, string>>(new Map());
 
-    // Fetch tenants from API on mount
+    // Use mock data directly (backend not accessible from Lovable preview)
     useEffect(() => {
-        const fetchTenants = async () => {
-            try {
-                const tenants = await api.getTenants();
-                if (tenants.length === 0) {
-                    // If no tenants in DB, use mock data
-                    setTenantsData(MOCK_TENANTS);
-                } else {
-                    setTenantsData(tenants);
-                }
-            } catch (error) {
-                console.error('Failed to fetch tenants, using mock data:', error);
-                setTenantsData(MOCK_TENANTS);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchTenants();
+        setTenantsData(MOCK_TENANTS);
+        setLoading(false);
     }, []);
 
-    // Fetch full tenant data when currentTenantId changes
+    // Set current tenant data from mock data when currentTenantId changes
     useEffect(() => {
-        const fetchCurrentTenantData = async () => {
-            if (!currentTenantId) {
-                setCurrentTenantData(null);
-                return;
-            }
-            try {
-                const data = await api.getTenant(currentTenantId);
-                setCurrentTenantData(data);
-            } catch (error) {
-                console.error('Failed to fetch tenant data:', error);
-                // Fallback to basic tenant data
-                const basicTenant = tenantsData.find(t => t.id === currentTenantId);
-                setCurrentTenantData(basicTenant || null);
-            }
-        };
-        fetchCurrentTenantData();
-    }, [currentTenantId]); // Removed tenantsData to prevent infinite loop
+        if (!currentTenantId) {
+            setCurrentTenantData(null);
+            return;
+        }
+        const tenant = tenantsData.find(t => t.id === currentTenantId);
+        setCurrentTenantData(tenant || null);
+    }, [currentTenantId, tenantsData]);
 
     const setCurrentTenantId = useCallback((id: string) => {
         setCurrentTenantIdState(id);
     }, []);
 
-    const updateTenantData = useCallback(async (tenantId: string, updatedData: Partial<TenantData>) => {
-        const signature = JSON.stringify(updatedData);
-        const lastSignature = lastUpdateSignatureRef.current.get(tenantId);
-
-        // Skip if this exact payload was just sent to avoid tight PUT loops
-        if (lastSignature === signature) {
-            return;
-        }
-        lastUpdateSignatureRef.current.set(tenantId, signature);
-
-        try {
-            await api.updateTenant(tenantId, updatedData);
-        } catch (error) {
-            console.error('Failed to update tenant:', error);
-        } finally {
-            // Always update local cache so UI stays in sync even if the PUT fails
-            setTenantsData(prev => prev.map(tenant =>
-                tenant.id === tenantId ? { ...tenant, ...updatedData } : tenant
-            ));
-            setCurrentTenantData(prev => prev ? { ...prev, ...updatedData } : null);
-        }
+    const updateTenantData = useCallback((tenantId: string, updatedData: Partial<TenantData>) => {
+        // Update local state only (no backend API calls)
+        setTenantsData(prev => prev.map(tenant =>
+            tenant.id === tenantId ? { ...tenant, ...updatedData } : tenant
+        ));
+        setCurrentTenantData(prev => prev ? { ...prev, ...updatedData } : null);
     }, []);
     
     const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
