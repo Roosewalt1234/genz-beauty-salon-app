@@ -1,39 +1,41 @@
 import React, { useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DataContext } from '../App';
+import { authenticateUser } from '../lib/database';
 
 const SignInPage: React.FC = () => {
     const navigate = useNavigate();
-    const { tenants, setCurrentTenantId } = useContext(DataContext);
+    const { setCurrentTenantId } = useContext(DataContext);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
     const handleSignIn = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setLoading(true);
 
-        // Hardcoded credentials
-        const validEmail = 'roose@gmail.com';
-        const validPassword = 'Abcd@1234';
-
-        if (email === validEmail && password === validPassword) {
-            // Store mock user info
-            const mockUser = {
-                id: '1',
-                email: validEmail,
-                name: 'Roose',
-                tenantId: tenants[0]?.id || '1'
-            };
-            localStorage.setItem('token', 'mock-token');
-            localStorage.setItem('user', JSON.stringify(mockUser));
+        try {
+            const result = await authenticateUser(email, password);
             
-            // Set tenant and navigate
-            setCurrentTenantId(mockUser.tenantId);
-            navigate('/dashboard');
-        } else {
-            setError('Invalid credentials');
+            if (result.success && result.user) {
+                // Store user info
+                localStorage.setItem('token', 'authenticated');
+                localStorage.setItem('user', JSON.stringify(result.user));
+                
+                // Set tenant and navigate
+                setCurrentTenantId(result.user.tenantId);
+                navigate('/dashboard');
+            } else {
+                setError(result.error || 'Invalid credentials');
+            }
+        } catch (err) {
+            console.error('Sign in error:', err);
+            setError('Failed to sign in. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -57,6 +59,7 @@ const SignInPage: React.FC = () => {
                             placeholder="Enter your email"
                             required
                             autoComplete="username"
+                            disabled={loading}
                         />
                     </div>
 
@@ -71,6 +74,7 @@ const SignInPage: React.FC = () => {
                                 placeholder="Enter your password"
                                 required
                                 autoComplete="current-password"
+                                disabled={loading}
                             />
                             <button
                                 type="button"
@@ -97,15 +101,17 @@ const SignInPage: React.FC = () => {
 
                     <button
                         type="submit"
-                        className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-lg shadow-md hover:from-purple-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105"
+                        disabled={loading}
+                        className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-lg shadow-md hover:from-purple-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                     >
-                        Sign In
+                        {loading ? 'Signing In...' : 'Sign In'}
                     </button>
 
                     <button
                         type="button"
                         onClick={() => navigate('/')}
                         className="w-full px-6 py-3 text-gray-600 font-medium hover:text-gray-800 transition-colors"
+                        disabled={loading}
                     >
                         Back to Home
                     </button>
