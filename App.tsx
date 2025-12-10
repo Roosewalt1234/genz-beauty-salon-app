@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { TenantData, ToastMessage, AppNotification, Product } from './types';
+import { getTenants, getTenantData } from './lib/database';
 import { MOCK_TENANTS } from './constants';
 import LandingPage from './pages/LandingPage';
 import SignInPage from './pages/SignInPage';
@@ -28,12 +29,14 @@ export const DataContext = React.createContext<{
     setCurrentTenantId: (id: string) => void;
     updateTenantData: (tenantId: string, updatedData: Partial<TenantData>) => void;
     addToast: (message: string, type: 'success' | 'error' | 'info') => void;
+    refreshTenantData: () => Promise<void>;
 }>({
     tenants: [],
     currentTenant: null,
     setCurrentTenantId: () => {},
     updateTenantData: () => {},
     addToast: () => {},
+    refreshTenantData: async () => {},
 });
 
 const App: React.FC = () => {
@@ -44,28 +47,72 @@ const App: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const notifSignatureRef = useRef<string>('');
 
-    // Use mock data directly (backend not accessible from Lovable preview)
+    // Fetch tenants from Supabase on mount
     useEffect(() => {
-        setTenantsData(MOCK_TENANTS);
-        setLoading(false);
+        const fetchTenants = async () => {
+            try {
+                const tenants = await getTenants();
+                if (tenants.length === 0) {
+                    // If no tenants in DB, use mock data for demo
+                    console.log('No tenants found in Supabase, using mock data');
+                    setTenantsData(MOCK_TENANTS);
+                } else {
+                    setTenantsData(tenants);
+                }
+            } catch (error) {
+                console.error('Failed to fetch tenants, using mock data:', error);
+                setTenantsData(MOCK_TENANTS);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchTenants();
     }, []);
 
-    // Set current tenant data from mock data when currentTenantId changes
+    // Fetch full tenant data when currentTenantId changes
     useEffect(() => {
-        if (!currentTenantId) {
-            setCurrentTenantData(null);
-            return;
+        const fetchCurrentTenantData = async () => {
+            if (!currentTenantId) {
+                setCurrentTenantData(null);
+                return;
+            }
+            try {
+                const data = await getTenantData(currentTenantId);
+                if (data) {
+                    setCurrentTenantData(data);
+                } else {
+                    // Fallback to mock data if not found in Supabase
+                    const mockTenant = MOCK_TENANTS.find(t => t.id === currentTenantId);
+                    setCurrentTenantData(mockTenant || null);
+                }
+            } catch (error) {
+                console.error('Failed to fetch tenant data:', error);
+                // Fallback to basic tenant data from list
+                const basicTenant = tenantsData.find(t => t.id === currentTenantId);
+                setCurrentTenantData(basicTenant || null);
+            }
+        };
+        fetchCurrentTenantData();
+    }, [currentTenantId]);
+
+    const refreshTenantData = useCallback(async () => {
+        if (!currentTenantId) return;
+        try {
+            const data = await getTenantData(currentTenantId);
+            if (data) {
+                setCurrentTenantData(data);
+            }
+        } catch (error) {
+            console.error('Failed to refresh tenant data:', error);
         }
-        const tenant = tenantsData.find(t => t.id === currentTenantId);
-        setCurrentTenantData(tenant || null);
-    }, [currentTenantId, tenantsData]);
+    }, [currentTenantId]);
 
     const setCurrentTenantId = useCallback((id: string) => {
         setCurrentTenantIdState(id);
     }, []);
 
     const updateTenantData = useCallback((tenantId: string, updatedData: Partial<TenantData>) => {
-        // Update local state only (no backend API calls)
+        // Update local state (for immediate UI feedback)
         setTenantsData(prev => prev.map(tenant =>
             tenant.id === tenantId ? { ...tenant, ...updatedData } : tenant
         ));
@@ -129,30 +176,25 @@ const App: React.FC = () => {
         const finalNotifications = activeNotifications.map(newNotification => {
             const existing = existingNotificationsById.get(newNotification.id);
             if (existing) {
-                // Preserve original creation date and read status, but update the message
                 return {
                     ...newNotification,
-                    // FIX: Cast `existing` to AppNotification to access its properties.
                     createdAt: (existing as AppNotification).createdAt,
                     isRead: (existing as AppNotification).isRead,
                 };
             }
-            return newNotification; // This is a new alert
+            return newNotification;
         });
 
         // Compare with current notifications to prevent infinite render loops
         const currentNotifString = JSON.stringify((currentTenant.notifications || []).map(n => ({id: n.id, message: n.message})).sort((a,b) => a.id.localeCompare(b.id)));
         const finalNotifString = JSON.stringify(finalNotifications.map(n => ({id: n.id, message: n.message})).sort((a,b) => a.id.localeCompare(b.id)));
 
-        // Prevent repeated PUTs: if the computed notifications haven't changed, stop here.
         if (finalNotifString === notifSignatureRef.current || currentNotifString === finalNotifString) {
             return;
         }
 
-        // Cache the signature so subsequent renders skip the update.
         notifSignatureRef.current = finalNotifString;
 
-        // Update local state without hitting the tenant PUT endpoint.
         setTenantsData(prev => prev.map(tenant =>
             tenant.id === currentTenant.id ? { ...tenant, notifications: finalNotifications } : tenant
         ));
@@ -167,7 +209,8 @@ const App: React.FC = () => {
         setCurrentTenantId,
         updateTenantData,
         addToast,
-    }), [tenantsData, currentTenant, setCurrentTenantId, updateTenantData, addToast]);
+        refreshTenantData,
+    }), [tenantsData, currentTenant, setCurrentTenantId, updateTenantData, addToast, refreshTenantData]);
     
 
     if (loading) {
@@ -175,7 +218,7 @@ const App: React.FC = () => {
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-rose-pink mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading...</p>
+                    <p className="text-gray-600">Connecting to database...</p>
                 </div>
             </div>
         );
