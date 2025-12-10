@@ -14,31 +14,26 @@ const SignInPage: React.FC = () => {
         e.preventDefault();
         setError('');
 
-        try {
-            const response = await fetch('http://localhost:3002/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
+        // Hardcoded credentials
+        const validEmail = 'roose@gmail.com';
+        const validPassword = 'Abcd@1234';
 
-            if (!response.ok) {
-                const data = await response.json();
-                setError(data.error || 'Invalid credentials');
-                return;
-            }
-
-            const data = await response.json();
-            
-            // Store token and user info
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('user', JSON.stringify(data.user));
+        if (email === validEmail && password === validPassword) {
+            // Store mock user info
+            const mockUser = {
+                id: '1',
+                email: validEmail,
+                name: 'Roose',
+                tenantId: tenants[0]?.id || '1'
+            };
+            localStorage.setItem('token', 'mock-token');
+            localStorage.setItem('user', JSON.stringify(mockUser));
             
             // Set tenant and navigate
-            setCurrentTenantId(data.user.tenantId);
+            setCurrentTenantId(mockUser.tenantId);
             navigate('/dashboard');
-        } catch (error: any) {
-            console.error('Login error:', error);
-            setError('Login failed. Please try again.');
+        } else {
+            setError('Invalid credentials');
         }
     };
 
