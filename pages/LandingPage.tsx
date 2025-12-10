@@ -9,11 +9,7 @@ const LandingPage: React.FC = () => {
     const displayServices = MOCK_TENANTS[0]?.services || [];
 
     const handleSignIn = () => {
-        // Set the first tenant as current (or you can implement proper authentication)
-        if (tenants.length > 0) {
-            setCurrentTenantId(tenants[0].id);
-            navigate('/dashboard');
-        }
+        navigate('/signin');
     };
 
     const handleEnterDashboard = (tenantId: string) => {

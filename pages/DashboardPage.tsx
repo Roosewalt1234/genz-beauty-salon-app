@@ -25,14 +25,11 @@ const DashboardHeader: React.FC<{ tenantName: string; todaysAppointmentsCount: n
         day: 'numeric',
     });
 
-    // Manually set date to match screenshot
-    const displayDate = `Saturday, September 20th, 2025`;
-
     return (
         <div className="bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white p-6 rounded-xl shadow-lg flex justify-between items-center">
             <div>
                 <h1 className="text-3xl font-bold" style={{fontFamily: "'Playfair Display', serif"}}>Welcome to {tenantName}</h1>
-                <p className="text-white/80">{displayDate}</p>
+                <p className="text-white/80">{formattedDate}</p>
             </div>
             <div className="text-center">
                 <p className="text-sm font-medium">Today's Appointments</p>
@@ -62,9 +59,9 @@ const StatCard: React.FC<{ title: string; value: string | number; percentageChan
 
 const UpcomingAppointments: React.FC = () => {
     const { currentTenant } = useContext(DataContext);
-    const upcoming = currentTenant?.appointments
+    const upcoming = (currentTenant?.appointments || [])
         .filter(a => new Date(a.startTime) > new Date())
-        .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()) || [];
+        .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg h-full">
@@ -75,8 +72,8 @@ const UpcomingAppointments: React.FC = () => {
             <div className="space-y-4">
                 {upcoming.length > 0 ? (
                     upcoming.slice(0, 3).map(app => {
-                        const client = currentTenant.clients.find(c => c.id === app.clientId);
-                        const staff = currentTenant.staff.find(s => s.id === app.staffId);
+                        const client = currentTenant.clients?.find(c => c.id === app.clientId);
+                        const staff = currentTenant.staff?.find(s => s.id === app.staffId);
                         return (
                              <div key={app.id} className="p-3 bg-light-pink/50 rounded-lg flex justify-between items-center">
                                 <div>
@@ -123,10 +120,10 @@ const QuickActions: React.FC = () => (
 
 const TopPerformers: React.FC = () => {
     const { currentTenant } = useContext(DataContext);
-    const performers = currentTenant?.staff
+    const performers = (currentTenant?.staff || [])
         .filter(s => s.isActive && s.rating)
         .sort((a,b) => (b.rating || 0) - (a.rating || 0))
-        .slice(0, 2) || [];
+        .slice(0, 2);
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg">
@@ -135,7 +132,7 @@ const TopPerformers: React.FC = () => {
                 {performers.map(staff => (
                     <div key={staff.id} className="flex items-center justify-between">
                         <div className="flex items-center">
-                            <img src={staff.profileImageUrl} alt={staff.name} className="h-10 w-10 rounded-full mr-3 object-cover" />
+                            <img src={staff.profile_image_url} alt={staff.name} className="h-10 w-10 rounded-full mr-3 object-cover" />
                             <div>
                                 <p className="font-semibold text-gray-700">{staff.name}</p>
                                 <p className="text-xs text-gray-500">{staff.role}</p>
@@ -154,10 +151,10 @@ const TopPerformers: React.FC = () => {
 
 const RecentAppointmentsTable: React.FC = () => {
     const { currentTenant } = useContext(DataContext);
-    const recent = currentTenant?.appointments
+    const recent = (currentTenant?.appointments || [])
         .filter(a => ['Completed', 'Paid'].includes(a.status))
         .sort((a,b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-        .slice(0, 5) || [];
+        .slice(0, 5);
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg">
@@ -182,9 +179,9 @@ const RecentAppointmentsTable: React.FC = () => {
                     <tbody className="text-gray-800">
                          {recent.map(app => {
                             if (!currentTenant) return null;
-                            const client = currentTenant.clients.find(c => c.id === app.clientId);
-                            const staff = currentTenant.staff.find(s => s.id === app.staffId);
-                            const services = app.serviceIds.map(id => currentTenant.services.find(s => s.id === id)?.name).filter(Boolean);
+                            const client = currentTenant.clients?.find(c => c.id === app.clientId);
+                            const staff = currentTenant.staff?.find(s => s.id === app.staffId);
+                            const services = app.serviceIds?.map(id => currentTenant.services?.find(s => s.id === id)?.name).filter(Boolean);
                             return (
                                 <tr key={app.id} className="border-t border-gray-100">
                                     <td className="p-3 font-semibold">{client?.name || 'Unknown Client'}</td>
@@ -219,19 +216,19 @@ const DashboardPage: React.FC = () => {
     }
 
     // Calculations for stat cards
-    const totalClients = currentTenant.clients.length;
-    const activeStaff = currentTenant.staff.filter(s => s.isActive).length;
+    const totalClients = currentTenant.clients?.length || 0;
+    const activeStaff = currentTenant.staff?.filter(s => s.isActive).length || 0;
 
     const today = new Date();
     today.setHours(0,0,0,0);
     
-    const appointmentsToday = currentTenant.appointments.filter(a => {
+    const appointmentsToday = (currentTenant.appointments || []).filter(a => {
         const appDate = new Date(a.startTime);
         appDate.setHours(0,0,0,0);
         return appDate.getTime() === today.getTime();
     }).length;
     
-    const thisMonthRevenue = currentTenant.appointments
+    const thisMonthRevenue = (currentTenant.appointments || [])
         .filter(a => a.status === 'Paid' && new Date(a.startTime).getMonth() === new Date().getMonth())
         .reduce((sum, a) => sum + (a.payment?.amount || 0), 0);
 

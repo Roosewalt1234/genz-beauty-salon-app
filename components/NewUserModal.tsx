@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { DataContext } from '../App';
 
 interface NewUserModalProps {
   isOpen: boolean;
@@ -11,49 +12,27 @@ interface StaffMember {
   email: string;
 }
 
-// Note: Supabase client should be imported from a shared config file
-// For now, we'll use a placeholder - this should be replaced with actual Supabase client
-const supabase = {
-  from: (table: string) => ({
-    select: (columns: string) => ({
-      eq: (column: string, value: any) => ({
-        data: null, // Placeholder
-        error: null
-      })
-    }),
-    insert: (data: any) => ({
-      error: null
-    })
-  })
-};
 
 const NewUserModal: React.FC<NewUserModalProps> = ({ isOpen, onClose }) => {
+  const { currentTenant } = useContext(DataContext);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (isOpen) {
-      fetchStaffMembers();
+    if (isOpen && currentTenant?.staff) {
+      const activeStaff = currentTenant.staff.filter(staff => staff.isActive);
+      setStaffMembers(activeStaff.map(staff => ({
+        id: staff.id,
+        name: staff.name,
+        email: staff.email || ''
+      })));
     }
-  }, [isOpen]);
-
-  const fetchStaffMembers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('staff')
-        .select('id, name, email')
-        .eq('is_active', true);
-
-      if (error) throw error;
-      setStaffMembers(data || []);
-    } catch (error) {
-      console.error('Error fetching staff:', error);
-    }
-  };
+  }, [isOpen, currentTenant]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -88,22 +67,27 @@ const NewUserModal: React.FC<NewUserModalProps> = ({ isOpen, onClose }) => {
     setLoading(true);
 
     try {
-      // Create user account
-      const { error } = await supabase
-        .from('user_accounts')
-        .insert({
-          staff_id: selectedEmployee,
+      const response = await fetch('http://localhost:3002/api/auth/create-user-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          staffId: selectedEmployee,
           email: email,
-          password_hash: password // In production, this should be hashed
-        });
+          password: password,
+          tenantId: currentTenant?.id
+        })
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to create user account');
+      }
 
-      alert('User created successfully!');
+      alert('User account created successfully!');
       handleClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating user:', error);
-      alert('Failed to create user. Please try again.');
+      alert(error.message || 'Failed to create user account. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -113,6 +97,7 @@ const NewUserModal: React.FC<NewUserModalProps> = ({ isOpen, onClose }) => {
     setSelectedEmployee('');
     setEmail('');
     setPassword('');
+    setShowPassword(false);
     setErrors({});
     onClose();
   };
@@ -141,7 +126,19 @@ const NewUserModal: React.FC<NewUserModalProps> = ({ isOpen, onClose }) => {
           </label>
           <select
             value={selectedEmployee}
-            onChange={(e) => setSelectedEmployee(e.target.value)}
+            onChange={(e) => {
+              const employeeId = e.target.value;
+              setSelectedEmployee(employeeId);
+              // Auto-fill email when employee is selected
+              if (employeeId) {
+                const selectedStaff = staffMembers.find(emp => emp.id === employeeId);
+                if (selectedStaff && selectedStaff.email) {
+                  setEmail(selectedStaff.email);
+                }
+              } else {
+                setEmail(''); // Clear email if no employee selected
+              }
+            }}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-rose-pink focus:border-transparent ${
               errors.selectedEmployee ? 'border-red-500' : 'border-gray-300'
             }`}
@@ -149,7 +146,7 @@ const NewUserModal: React.FC<NewUserModalProps> = ({ isOpen, onClose }) => {
             <option value="">Choose an employee...</option>
             {staffMembers.map(employee => (
               <option key={employee.id} value={employee.id}>
-                {employee.name} - {employee.email}
+                {employee.name} - {employee.email || 'No email'}
               </option>
             ))}
           </select>
@@ -182,15 +179,33 @@ const NewUserModal: React.FC<NewUserModalProps> = ({ isOpen, onClose }) => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Password *
           </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-rose-pink focus:border-transparent ${
-              errors.password ? 'border-red-500' : 'border-gray-300'
-            }`}
-            placeholder="Enter password"
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-rose-pink focus:border-transparent ${
+                errors.password ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder="Enter password"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+            >
+              {showPassword ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              )}
+            </button>
+          </div>
           {errors.password && (
             <p className="text-red-500 text-xs mt-1">{errors.password}</p>
           )}

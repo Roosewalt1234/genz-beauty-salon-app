@@ -169,5 +169,21 @@ export const MOCK_TENANTS: TenantData[] = [
         { id: 'sm1', productId: 'p1', date: new Date(new Date().setDate(new Date().getDate() - 15)).toISOString(), type: 'in', quantity: 20, reason: 'Purchase Order', relatedPoId: 'po1'}
     ],
     notifications: [],
+  },
+  {
+    id: 't2',
+    name: 'Elegance Spa & Salon',
+    clients: [],
+    staff: [],
+    services: [],
+    packages: [],
+    appointments: [],
+    inventory: [],
+    campaigns: [],
+    complianceTasks: [],
+    suppliers: [],
+    purchaseOrders: [],
+    stockMovements: [],
+    notifications: [],
   }
 ];

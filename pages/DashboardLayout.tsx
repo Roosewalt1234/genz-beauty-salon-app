@@ -107,6 +107,7 @@ const NotificationsDropdown: React.FC = () => {
 const DashboardLayout: React.FC = () => {
     const { currentTenant, setCurrentTenantId } = useContext(DataContext);
     const navigate = useNavigate();
+    const [currentUser, setCurrentUser] = useState<any>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isCompanyDetailsModalOpen, setIsCompanyDetailsModalOpen] = useState(false);
     const [isAccessPermissionModalOpen, setIsAccessPermissionModalOpen] = useState(false);
@@ -125,6 +126,13 @@ const DashboardLayout: React.FC = () => {
     const [isAddReceivableModalOpen, setIsAddReceivableModalOpen] = useState(false);
     const [isAddPayableModalOpen, setIsAddPayableModalOpen] = useState(false);
     const settingsRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const user = localStorage.getItem('user');
+        if (user) {
+            setCurrentUser(JSON.parse(user));
+        }
+    }, []);
 
     // Add event listeners for opening add modals
     useEffect(() => {
@@ -369,6 +377,16 @@ const DashboardLayout: React.FC = () => {
                     </h2>
                     <div className="flex items-center gap-4">
                         <NotificationsDropdown />
+                        {currentUser && (
+                            <div className="flex items-center gap-2 px-3 py-2">
+                                <img
+                                    src={currentUser.profile_image_url || 'https://placehold.co/32x32?text=U'}
+                                    alt="User Avatar"
+                                    className="w-8 h-8 rounded-full object-cover"
+                                />
+                                <span className="text-sm font-medium text-gray-700">{currentUser.name}</span>
+                            </div>
+                        )}
                         <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">
                             <LogoutIcon className="h-5 w-5" />
                             <span className="text-sm font-medium">Logout</span>

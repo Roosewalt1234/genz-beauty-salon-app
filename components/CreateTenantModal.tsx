@@ -1,4 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { DataContext } from '../App';
+import { TenantData } from '../types';
+import { api } from '../api';
 
 interface CreateTenantModalProps {
   isOpen: boolean;
@@ -6,6 +10,8 @@ interface CreateTenantModalProps {
 }
 
 const CreateTenantModal: React.FC<CreateTenantModalProps> = ({ isOpen, onClose }) => {
+  const navigate = useNavigate();
+  const { tenants, addToast, setCurrentTenantId } = useContext(DataContext);
   const [companyName, setCompanyName] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
@@ -13,6 +19,14 @@ const CreateTenantModal: React.FC<CreateTenantModalProps> = ({ isOpen, onClose }
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [generatedPassword, setGeneratedPassword] = useState('');
+
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
 
   const generatePassword = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
@@ -61,17 +75,64 @@ const CreateTenantModal: React.FC<CreateTenantModalProps> = ({ isOpen, onClose }
     setLoading(true);
 
     try {
-      // Here you would typically make an API call to create the tenant
-      // For now, we'll simulate the process
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const newTenant = {
+        id: generateUUID(),
+        name: companyName,
+        ownerName: ownerName,
+        ownerEmail: ownerEmail,
+        ownerPassword: tempPassword
+      };
 
-      // Show the generated password to the user
-      alert(`Tenant created successfully!\n\nCompany: ${companyName}\nOwner: ${ownerName}\nEmail: ${ownerEmail}\nTemporary Password: ${tempPassword}\n\nPlease save this password as it will only be shown once.`);
+      console.log('Creating tenant:', newTenant);
+      const result = await api.createTenant(newTenant);
+      console.log('Tenant created:', result);
+
+      // Also create the owner user account
+      const response = await fetch('http://localhost:3002/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: ownerEmail,
+          password: tempPassword,
+          name: ownerName,
+          tenantId: newTenant.id,
+          role: 'owner'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create owner account');
+      }
+
+      // Automatically log in the new owner
+      const loginResponse = await fetch('http://localhost:3002/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: ownerEmail, password: tempPassword })
+      });
+
+      if (!loginResponse.ok) {
+        throw new Error('Failed to log in owner');
+      }
+
+      const loginData = await loginResponse.json();
+
+      // Store token and user info
+      localStorage.setItem('token', loginData.token);
+      localStorage.setItem('user', JSON.stringify(loginData.user));
+
+      // Set tenant and navigate
+      setCurrentTenantId(loginData.user.tenantId);
+      navigate('/dashboard');
+
+      addToast(`Tenant "${companyName}" created successfully! Owner logged in.`, 'success');
+      alert(`Tenant created successfully!\n\nCompany: ${companyName}\nOwner: ${ownerName}\nEmail: ${ownerEmail}\nTemporary Password: ${tempPassword}\n\nYou are now logged in as the owner. Please save this password for future logins.`);
 
       handleClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating tenant:', error);
-      alert('Failed to create tenant. Please try again.');
+      addToast(error.message || 'Failed to create tenant', 'error');
+      alert('Error: ' + (error.message || 'Failed to create tenant. Check console for details.'));
     } finally {
       setLoading(false);
     }

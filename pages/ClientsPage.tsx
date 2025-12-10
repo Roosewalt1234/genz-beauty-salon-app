@@ -366,26 +366,49 @@ const ClientsPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filters, setFilters] = useState({ status: 'all', service: 'all' });
 
-    const handleSaveClient = (clientData: Omit<Client, 'id' | 'createdAt'> | Client) => {
+    const handleSaveClient = async (clientData: Omit<Client, 'id' | 'createdAt'> | Client) => {
         if (!currentTenant) return;
-        
-        if ('id' in clientData) { // Editing
-            const updatedClients = currentTenant.clients.map(c => c.id === clientData.id ? clientData : c);
-            updateTenantData(currentTenant.id, { clients: updatedClients });
-            addToast('Client updated successfully!', 'success');
-        } else { // Adding
-            const newClient: Client = {
-                id: `c${Date.now()}`,
-                createdAt: new Date().toISOString(),
-                loyaltyPoints: 0,
-                ...clientData,
-            };
-            updateTenantData(currentTenant.id, { clients: [...currentTenant.clients, newClient] });
-            addToast('Client added successfully!', 'success');
-            addToast(`Welcome email sent to ${newClient.name}.`, 'info');
+
+        try {
+            if ('id' in clientData) { // Editing
+                const response = await fetch(`http://localhost:3002/api/clients/${clientData.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(clientData)
+                });
+
+                if (!response.ok) throw new Error('Failed to update client');
+
+                const updatedClient = await response.json();
+                const updatedClients = currentTenant.clients.map(c => c.id === clientData.id ? updatedClient : c);
+                updateTenantData(currentTenant.id, { clients: updatedClients });
+                addToast('Client updated successfully!', 'success');
+            } else { // Adding
+                const newClientData = {
+                    id: `c${Date.now()}`,
+                    tenantId: currentTenant.id,
+                    ...clientData,
+                };
+
+                const response = await fetch('http://localhost:3002/api/clients', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newClientData)
+                });
+
+                if (!response.ok) throw new Error('Failed to add client');
+
+                const newClient = await response.json();
+                updateTenantData(currentTenant.id, { clients: [...currentTenant.clients, newClient] });
+                addToast('Client added successfully!', 'success');
+                addToast(`Welcome email sent to ${newClient.name}.`, 'info');
+            }
+            setIsModalOpen(false);
+            setEditingClient(undefined);
+        } catch (error) {
+            console.error('Error saving client:', error);
+            addToast('Failed to save client', 'error');
         }
-        setIsModalOpen(false);
-        setEditingClient(undefined);
     };
 
     const handleClientUpdate = (updatedClient: Client) => {

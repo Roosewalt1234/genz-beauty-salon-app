@@ -27,7 +27,7 @@ const StaffForm: React.FC<{ staffMember?: Staff; onSave: (staffMember: Omit<Staf
         role: staffMember?.role || '',
         yearsOfExperience: staffMember?.yearsOfExperience || '',
         commission: staffMember?.commission || '',
-        profileImageUrl: staffMember?.profileImageUrl || '',
+        profile_image_url: staffMember?.profile_image_url || '',
         bio: staffMember?.bio || '',
         specializations: staffMember?.specializations || [],
         isActive: staffMember?.isActive === undefined ? true : staffMember.isActive,
@@ -48,6 +48,9 @@ const StaffForm: React.FC<{ staffMember?: Staff; onSave: (staffMember: Omit<Staf
         },
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string>(staffMember?.profile_image_url || '');
+    const [uploading, setUploading] = useState(false);
 
     const validate = () => {
         const newErrors: Record<string, string> = {};
@@ -96,11 +99,63 @@ const StaffForm: React.FC<{ staffMember?: Staff; onSave: (staffMember: Omit<Staf
         });
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setImageFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleImageDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            setImageFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const uploadImage = async () => {
+        if (!imageFile) return formData.profile_image_url;
+        
+        setUploading(true);
+        try {
+            const formDataUpload = new FormData();
+            formDataUpload.append('image', imageFile);
+            
+            const response = await fetch('http://localhost:3002/api/upload/image', {
+                method: 'POST',
+                body: formDataUpload
+            });
+            
+            if (!response.ok) throw new Error('Upload failed');
+            
+            const data = await response.json();
+            return data.url;
+        } catch (error) {
+            console.error('Image upload error:', error);
+            return formData.profile_image_url;
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (validate()) {
+            const uploadedImageUrl = await uploadImage();
             const dataToSave = {
                 ...formData,
+                profile_image_url: uploadedImageUrl,
                 role: formData.role as StaffRole,
                 yearsOfExperience: formData.yearsOfExperience ? parseInt(String(formData.yearsOfExperience), 10) : undefined,
                 commission: formData.commission ? parseFloat(String(formData.commission)) : undefined,
@@ -158,8 +213,42 @@ const StaffForm: React.FC<{ staffMember?: Staff; onSave: (staffMember: Omit<Staf
                     <input type="number" step="0.1" name="commission" value={formData.commission} onChange={handleChange} className={inputClass('commission')} />
                 </div>
                 <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700">Profile Image URL</label>
-                    <input type="text" name="profileImageUrl" placeholder="https://example.com/image.jpg" value={formData.profileImageUrl} onChange={handleChange} className={inputClass('profileImageUrl')} />
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Profile Image</label>
+                    <div 
+                        onDrop={handleImageDrop}
+                        onDragOver={(e) => e.preventDefault()}
+                        className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-rose-pink transition-colors"
+                    >
+                        {imagePreview ? (
+                            <div className="space-y-2">
+                                <img src={imagePreview} alt="Preview" className="w-32 h-32 object-cover rounded-full mx-auto" />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setImageFile(null);
+                                        setImagePreview('');
+                                        setFormData(prev => ({ ...prev, profile_image_url: '' }));
+                                    }}
+                                    className="text-sm text-red-600 hover:underline"
+                                >
+                                    Remove Image
+                                </button>
+                            </div>
+                        ) : (
+                            <div>
+                                <p className="text-gray-600 mb-2">Drag & drop image here or</p>
+                                <label className="cursor-pointer inline-block px-4 py-2 bg-rose-pink text-white rounded-lg hover:bg-rose-pink/90">
+                                    Choose File
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                        className="hidden"
+                                    />
+                                </label>
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700">Bio</label>
@@ -232,8 +321,10 @@ const StaffForm: React.FC<{ staffMember?: Staff; onSave: (staffMember: Omit<Staf
             </FormSection>
 
             <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={onCancel} className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors">Cancel</button>
-                <button type="submit" className="px-6 py-2 bg-gradient-to-r from-rose-pink to-lavender-purple text-white rounded-lg hover:opacity-90 transition-opacity shadow font-semibold">{staffMember ? 'Save Changes' : 'Add Staff Member'}</button>
+                <button type="button" onClick={onCancel} disabled={uploading} className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50">Cancel</button>
+                <button type="submit" disabled={uploading} className="px-6 py-2 bg-gradient-to-r from-rose-pink to-lavender-purple text-white rounded-lg hover:opacity-90 transition-opacity shadow font-semibold disabled:opacity-50">
+                    {uploading ? 'Uploading...' : (staffMember ? 'Save Changes' : 'Add Staff Member')}
+                </button>
             </div>
         </form>
     )
@@ -279,9 +370,9 @@ const StaffCard: React.FC<{ staff: Staff, onEdit: (staff: Staff) => void, onDele
             <div className="relative p-6 pt-16 flex-grow">
                 {/* Profile Image */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                    <img 
-                        src={staff.profileImageUrl || 'https://i.pravatar.cc/150'} 
-                        alt={staff.name} 
+                    <img
+                        src={staff.profile_image_url || 'https://via.placeholder.com/96x96?text=U'}
+                        alt={staff.name}
                         className="w-24 h-24 rounded-full border-4 border-white object-cover shadow-lg"
                     />
                 </div>
@@ -355,6 +446,14 @@ const StaffCard: React.FC<{ staff: Staff, onEdit: (staff: Staff) => void, onDele
 };
 
 
+const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
+
 const StaffPage: React.FC = () => {
     const { currentTenant, updateTenantData, addToast } = useContext(DataContext);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -364,36 +463,71 @@ const StaffPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
 
-    const handleSaveStaff = (staffData: Omit<Staff, 'id'> | Staff) => {
+    const handleSaveStaff = async (staffData: Omit<Staff, 'id'> | Staff) => {
         if (!currentTenant) return;
         
-        if ('id' in staffData) { // Editing
-            const updatedStaff = currentTenant.staff.map(s => s.id === staffData.id ? staffData : s);
-            updateTenantData(currentTenant.id, { staff: updatedStaff });
-            addToast('Staff member updated successfully!', 'success');
-        } else { // Adding
-            const newStaff: Staff = {
-                id: `st${Date.now()}`,
-                schedule: DEFAULT_SCHEDULE,
-                ...staffData,
-            };
-            updateTenantData(currentTenant.id, { staff: [...currentTenant.staff, newStaff] });
-            addToast('Staff member added successfully!', 'success');
-            addToast(`Onboarding invite sent to ${newStaff.phone} via WhatsApp.`, 'info');
+        try {
+            if ('id' in staffData) { // Editing
+                const response = await fetch(`http://localhost:3002/api/staff/${staffData.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(staffData)
+                });
+                
+                if (!response.ok) throw new Error('Failed to update staff');
+                
+                const updatedStaff = (currentTenant.staff || []).map(s => s.id === staffData.id ? staffData : s);
+                updateTenantData(currentTenant.id, { staff: updatedStaff });
+                addToast('Staff member updated successfully!', 'success');
+            } else { // Adding
+                const newStaff: Staff = {
+                    id: generateUUID(),
+                    schedule: DEFAULT_SCHEDULE,
+                    ...staffData,
+                };
+                
+                const response = await fetch('http://localhost:3002/api/staff', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...newStaff, tenantId: currentTenant.id })
+                });
+                
+                if (!response.ok) throw new Error('Failed to add staff');
+                
+                updateTenantData(currentTenant.id, { staff: [...(currentTenant.staff || []), newStaff] });
+                addToast('Staff member added successfully!', 'success');
+                addToast(`Onboarding invite sent to ${newStaff.phone} via WhatsApp.`, 'info');
+            }
+            setIsModalOpen(false);
+            setEditingStaff(undefined);
+        } catch (error) {
+            console.error('Error saving staff:', error);
+            addToast('Failed to save staff member', 'error');
         }
-        setIsModalOpen(false);
-        setEditingStaff(undefined);
     };
 
-    const handleSaveSchedule = (schedule: StaffSchedule) => {
+    const handleSaveSchedule = async (schedule: StaffSchedule) => {
         if (!currentTenant || !schedulingStaff) return;
-        
-        const updatedStaffMember = { ...schedulingStaff, schedule };
-        const updatedStaffList = currentTenant.staff.map(s => s.id === schedulingStaff.id ? updatedStaffMember : s);
-        
-        updateTenantData(currentTenant.id, { staff: updatedStaffList });
-        addToast(`Schedule for ${schedulingStaff.name} updated successfully!`, 'success');
-        setIsScheduleModalOpen(false);
+
+        try {
+            const updatedStaffMember = { ...schedulingStaff, schedule };
+
+            const response = await fetch(`http://localhost:3002/api/staff/${schedulingStaff.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedStaffMember)
+            });
+
+            if (!response.ok) throw new Error('Failed to update schedule');
+
+            const updatedStaffList = (currentTenant.staff || []).map(s => s.id === schedulingStaff.id ? updatedStaffMember : s);
+            updateTenantData(currentTenant.id, { staff: updatedStaffList });
+            addToast(`Schedule for ${schedulingStaff.name} updated successfully!`, 'success');
+            setIsScheduleModalOpen(false);
+        } catch (error) {
+            console.error('Error updating schedule:', error);
+            addToast('Failed to update schedule', 'error');
+        }
     };
 
 
@@ -412,17 +546,28 @@ const StaffPage: React.FC = () => {
         setIsScheduleModalOpen(true);
     };
 
-    const handleDelete = (staffId: string) => {
+    const handleDelete = async (staffId: string) => {
         if (!currentTenant) return;
         if (window.confirm('Are you sure you want to delete this staff member? This cannot be undone.')) {
-            const updatedStaff = currentTenant.staff.filter(s => s.id !== staffId);
-            updateTenantData(currentTenant.id, { staff: updatedStaff });
-            addToast('Staff member deleted.', 'info');
+            try {
+                const response = await fetch(`http://localhost:3002/api/staff/${staffId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) throw new Error('Failed to delete staff');
+                
+                const updatedStaff = (currentTenant.staff || []).filter(s => s.id !== staffId);
+                updateTenantData(currentTenant.id, { staff: updatedStaff });
+                addToast('Staff member deleted.', 'info');
+            } catch (error) {
+                console.error('Error deleting staff:', error);
+                addToast('Failed to delete staff member', 'error');
+            }
         }
     };
 
     const filteredStaff = useMemo(() => {
-        if (!currentTenant) return [];
+        if (!currentTenant || !currentTenant.staff) return [];
         return currentTenant.staff.filter(staff => {
             const searchTermLower = searchTerm.toLowerCase();
             

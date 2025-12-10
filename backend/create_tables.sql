@@ -1,4 +1,9 @@
--- Create tenants table
+-- Enable UUID generation (if not already enabled)
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- =========================
+-- TENANTS
+-- =========================
 CREATE TABLE tenants (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -10,22 +15,29 @@ CREATE TABLE tenants (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create users table (clients/customers)
+-- =========================
+-- USERS (CUSTOMERS / CLIENTS / OWNERS PER TENANT)
+-- =========================
 CREATE TABLE users (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
   phone VARCHAR(20),
+  password_hash VARCHAR(255),
+  role VARCHAR(50) DEFAULT 'client', -- 'owner', 'client', etc.
+  is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(tenant_id, email)
 );
 
--- Create services table
+-- =========================
+-- SERVICES
+-- =========================
 CREATE TABLE services (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
   description TEXT,
   price DECIMAL(10,2) NOT NULL,
@@ -35,26 +47,39 @@ CREATE TABLE services (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create staff table
+-- =========================
+-- STAFF (EMPLOYEES)
+-- FIXED: id TYPE = UUID, tenant_id TYPE = UUID
+-- =========================
 CREATE TABLE staff (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) NOT NULL,
+  email VARCHAR(255),
   phone VARCHAR(20),
   role VARCHAR(100),
+  years_of_experience INTEGER,
+  commission DECIMAL(5,2),
+  profile_image_url TEXT,
+  rating DECIMAL(3,2),
+  bio TEXT,
+  specializations TEXT[],
   is_active BOOLEAN DEFAULT TRUE,
+  schedule JSONB,
+  identity JSONB,
+  salary JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(tenant_id, email)
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create bookings table
+-- =========================
+-- BOOKINGS
+-- =========================
 CREATE TABLE bookings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  service_id UUID REFERENCES services(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  service_id UUID NOT NULL REFERENCES services(id) ON DELETE CASCADE,
   staff_id UUID REFERENCES staff(id) ON DELETE SET NULL,
   booking_date DATE NOT NULL,
   booking_time TIME NOT NULL,
@@ -64,10 +89,12 @@ CREATE TABLE bookings (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create inventory table
+-- =========================
+-- INVENTORY
+-- =========================
 CREATE TABLE inventory (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
   description TEXT,
   category VARCHAR(100),
@@ -78,10 +105,12 @@ CREATE TABLE inventory (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create campaigns table
+-- =========================
+-- CAMPAIGNS
+-- =========================
 CREATE TABLE campaigns (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
   description TEXT,
   start_date DATE NOT NULL,
@@ -92,11 +121,13 @@ CREATE TABLE campaigns (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create user_accounts table
+-- =========================
+-- USER ACCOUNTS (STAFF LOGIN ACCOUNTS)
+-- =========================
 CREATE TABLE user_accounts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
-  staff_id UUID REFERENCES staff(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
   email VARCHAR(255) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   is_active BOOLEAN DEFAULT TRUE,
@@ -106,24 +137,29 @@ CREATE TABLE user_accounts (
   UNIQUE(tenant_id, email)
 );
 
--- Create permissions table
+-- =========================
+-- PERMISSIONS (PER STAFF)
+-- FIXED: employee_id TYPE = UUID REFERENCES staff(id)
+-- =========================
 CREATE TABLE permissions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
-  employee_id UUID REFERENCES staff(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  employee_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
   item_name VARCHAR(255) NOT NULL,
   item_type VARCHAR(50) NOT NULL, -- 'parent' or 'child'
-  parent_item VARCHAR(255), -- null for parent items
+  parent_item VARCHAR(255),       -- null for parent items
   has_access BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(tenant_id, employee_id, item_name)
 );
 
--- Create accounting tables
+-- =========================
+-- SALES REGISTER
+-- =========================
 CREATE TABLE sales_register (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   invoice_number VARCHAR(50) NOT NULL,
   customer_name VARCHAR(255),
   customer_id UUID REFERENCES users(id),
@@ -139,9 +175,12 @@ CREATE TABLE sales_register (
   UNIQUE(tenant_id, invoice_number)
 );
 
+-- =========================
+-- EXPENSE REGISTER
+-- =========================
 CREATE TABLE expense_register (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   expense_number VARCHAR(50) NOT NULL,
   category VARCHAR(100) NOT NULL,
   description TEXT,
@@ -158,9 +197,12 @@ CREATE TABLE expense_register (
   UNIQUE(tenant_id, expense_number)
 );
 
+-- =========================
+-- ACCOUNTS RECEIVABLE
+-- =========================
 CREATE TABLE accounts_receivable (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   customer_id UUID REFERENCES users(id),
   customer_name VARCHAR(255),
   invoice_id UUID REFERENCES sales_register(id),
@@ -173,9 +215,12 @@ CREATE TABLE accounts_receivable (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- =========================
+-- ACCOUNTS PAYABLE
+-- =========================
 CREATE TABLE accounts_payable (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   vendor_name VARCHAR(255) NOT NULL,
   expense_id UUID REFERENCES expense_register(id),
   amount DECIMAL(10,2) NOT NULL,
@@ -187,10 +232,14 @@ CREATE TABLE accounts_payable (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- =========================
+-- PAYROLL
+-- FIXED: staff_id TYPE = UUID REFERENCES staff(id)
+-- =========================
 CREATE TABLE payroll (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
-  staff_id UUID REFERENCES staff(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
   pay_period_start DATE NOT NULL,
   pay_period_end DATE NOT NULL,
   base_salary DECIMAL(10,2) NOT NULL,
@@ -209,15 +258,27 @@ CREATE TABLE payroll (
   UNIQUE(tenant_id, staff_id, pay_period_start, pay_period_end)
 );
 
--- Create indexes for better performance
+-- =========================
+-- INDEXES
+-- =========================
+
+-- Bookings
 CREATE INDEX idx_bookings_user_id ON bookings(user_id);
 CREATE INDEX idx_bookings_service_id ON bookings(service_id);
 CREATE INDEX idx_bookings_staff_id ON bookings(staff_id);
 CREATE INDEX idx_bookings_date ON bookings(booking_date);
+
+-- Inventory
 CREATE INDEX idx_inventory_category ON inventory(category);
+
+-- Campaigns
 CREATE INDEX idx_campaigns_dates ON campaigns(start_date, end_date);
+
+-- Permissions
 CREATE INDEX idx_permissions_employee_id ON permissions(employee_id);
 CREATE INDEX idx_permissions_item_name ON permissions(item_name);
+
+-- User accounts
 CREATE INDEX idx_user_accounts_tenant_id ON user_accounts(tenant_id);
 CREATE INDEX idx_user_accounts_staff_id ON user_accounts(staff_id);
 CREATE INDEX idx_user_accounts_email ON user_accounts(email);
@@ -226,15 +287,19 @@ CREATE INDEX idx_user_accounts_email ON user_accounts(email);
 CREATE INDEX idx_sales_register_tenant_id ON sales_register(tenant_id);
 CREATE INDEX idx_sales_register_customer_id ON sales_register(customer_id);
 CREATE INDEX idx_sales_register_invoice_number ON sales_register(invoice_number);
+
 CREATE INDEX idx_expense_register_tenant_id ON expense_register(tenant_id);
 CREATE INDEX idx_expense_register_category ON expense_register(category);
 CREATE INDEX idx_expense_register_expense_number ON expense_register(expense_number);
+
 CREATE INDEX idx_accounts_receivable_tenant_id ON accounts_receivable(tenant_id);
 CREATE INDEX idx_accounts_receivable_customer_id ON accounts_receivable(customer_id);
 CREATE INDEX idx_accounts_receivable_status ON accounts_receivable(status);
+
 CREATE INDEX idx_accounts_payable_tenant_id ON accounts_payable(tenant_id);
 CREATE INDEX idx_accounts_payable_vendor_name ON accounts_payable(vendor_name);
 CREATE INDEX idx_accounts_payable_status ON accounts_payable(status);
+
 CREATE INDEX idx_payroll_tenant_id ON payroll(tenant_id);
 CREATE INDEX idx_payroll_staff_id ON payroll(staff_id);
 CREATE INDEX idx_payroll_pay_period ON payroll(pay_period_start, pay_period_end);

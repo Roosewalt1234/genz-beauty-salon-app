@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { DataContext } from '../App';
 
 interface AccessPermissionModalProps {
   isOpen: boolean;
@@ -48,6 +49,13 @@ const navigationItems: PermissionItem[] = [
   { name: 'Marketing', type: 'parent' },
   { name: 'Services', type: 'parent' },
   { name: 'Reports', type: 'parent' },
+  { name: 'Accounting', type: 'parent', children: [
+    'Sales Register',
+    'Expense Register',
+    'Accounts Receivable',
+    'Accounts Payable',
+    'Payroll'
+  ]},
   { name: 'Settings', type: 'parent', children: [
     'Company Details',
     'Access Permission',
@@ -58,6 +66,8 @@ const navigationItems: PermissionItem[] = [
 ];
 
 const AccessPermissionModal: React.FC<AccessPermissionModalProps> = ({ isOpen, onClose }) => {
+  const { currentTenant } = useContext(DataContext);
+  const currentTenantId = currentTenant?.id;
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
@@ -76,14 +86,15 @@ const AccessPermissionModal: React.FC<AccessPermissionModalProps> = ({ isOpen, o
   }, [selectedEmployee]);
 
   const fetchStaffMembers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('staff')
-        .select('id, name, email')
-        .eq('is_active', true);
+    if (!currentTenantId) return;
 
-      if (error) throw error;
-      setStaffMembers(data || []);
+    try {
+      const response = await fetch(`http://localhost:3002/api/tenants/${currentTenantId}`);
+      if (!response.ok) throw new Error('Failed to fetch tenant data');
+
+      const data = await response.json();
+      const staff = data.staff || [];
+      setStaffMembers(staff.map((s: any) => ({ id: s.id, name: s.name, email: s.email })));
     } catch (error) {
       console.error('Error fetching staff:', error);
     }
@@ -232,20 +243,26 @@ const AccessPermissionModal: React.FC<AccessPermissionModalProps> = ({ isOpen, o
                   {navigationItems.map(item => (
                     <div key={item.name} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <span className="font-medium text-gray-700">{item.name}</span>
+                          <div className="flex items-center space-x-3">
+                              <input
+                                  type="checkbox"
+                                  checked={permissions[item.name] || false}
+                                  onChange={(e) => handlePermissionChange(item.name, e.target.checked)}
+                                  className="w-4 h-4 text-rose-pink focus:ring-rose-pink"
+                              />
+                              <span className="font-medium text-gray-700">{item.name}</span>
+                              {item.children && item.children.length > 0 && (
+                                  <span className="text-sm text-gray-500">({item.children.length} sub-items)</span>
+                              )}
+                          </div>
                           {item.children && item.children.length > 0 && (
-                            <span className="text-sm text-gray-500">({item.children.length} sub-items)</span>
+                              <button
+                                  onClick={() => handleParentToggle(item)}
+                                  className="text-sm px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                              >
+                                  {item.children.every(child => permissions[child]) ? 'Deselect All' : 'Select All'}
+                              </button>
                           )}
-                        </div>
-                        {item.children && item.children.length > 0 && (
-                          <button
-                            onClick={() => handleParentToggle(item)}
-                            className="text-sm px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-                          >
-                            {item.children.every(child => permissions[child]) ? 'Deselect All' : 'Select All'}
-                          </button>
-                        )}
                       </div>
 
                       {item.children && item.children.length > 0 && (

@@ -3,7 +3,9 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { TenantData, ToastMessage, AppNotification, Product } from './types';
 import { MOCK_TENANTS } from './constants';
+import { api } from './api';
 import LandingPage from './pages/LandingPage';
+import SignInPage from './pages/SignInPage';
 import DashboardLayout from './pages/DashboardLayout';
 import DashboardPage from './pages/DashboardPage';
 import ClientsPage from './pages/ClientsPage';
@@ -36,18 +38,72 @@ export const DataContext = React.createContext<{
 });
 
 const App: React.FC = () => {
-    const [tenantsData, setTenantsData] = useState<TenantData[]>(MOCK_TENANTS);
+    const [tenantsData, setTenantsData] = useState<TenantData[]>([]);
     const [currentTenantId, setCurrentTenantIdState] = useState<string | null>(null);
+    const [currentTenantData, setCurrentTenantData] = useState<TenantData | null>(null);
     const [toasts, setToasts] = useState<ToastMessage[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    // Fetch tenants from API on mount
+    useEffect(() => {
+        const fetchTenants = async () => {
+            try {
+                const tenants = await api.getTenants();
+                if (tenants.length === 0) {
+                    // If no tenants in DB, use mock data
+                    setTenantsData(MOCK_TENANTS);
+                } else {
+                    setTenantsData(tenants);
+                }
+            } catch (error) {
+                console.error('Failed to fetch tenants, using mock data:', error);
+                setTenantsData(MOCK_TENANTS);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchTenants();
+    }, []);
+
+    // Fetch full tenant data when currentTenantId changes
+    useEffect(() => {
+        const fetchCurrentTenantData = async () => {
+            if (!currentTenantId) {
+                setCurrentTenantData(null);
+                return;
+            }
+            try {
+                const data = await api.getTenant(currentTenantId);
+                setCurrentTenantData(data);
+            } catch (error) {
+                console.error('Failed to fetch tenant data:', error);
+                // Fallback to basic tenant data
+                const basicTenant = tenantsData.find(t => t.id === currentTenantId);
+                setCurrentTenantData(basicTenant || null);
+            }
+        };
+        fetchCurrentTenantData();
+    }, [currentTenantId, tenantsData]);
 
     const setCurrentTenantId = useCallback((id: string) => {
         setCurrentTenantIdState(id);
     }, []);
 
-    const updateTenantData = useCallback((tenantId: string, updatedData: Partial<TenantData>) => {
-        setTenantsData(prev => prev.map(tenant => 
-            tenant.id === tenantId ? { ...tenant, ...updatedData } : tenant
-        ));
+    const updateTenantData = useCallback(async (tenantId: string, updatedData: Partial<TenantData>) => {
+        try {
+            await api.updateTenant(tenantId, updatedData);
+            setTenantsData(prev => prev.map(tenant =>
+                tenant.id === tenantId ? { ...tenant, ...updatedData } : tenant
+            ));
+            setCurrentTenantData(prev => prev ? { ...prev, ...updatedData } : null);
+        } catch (error) {
+            console.error('Failed to update tenant:', error);
+            // Still update locally if API fails
+            setTenantsData(prev => prev.map(tenant =>
+                tenant.id === tenantId ? { ...tenant, ...updatedData } : tenant
+            ));
+            setCurrentTenantData(prev => prev ? { ...prev, ...updatedData } : null);
+        }
     }, []);
     
     const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -58,7 +114,7 @@ const App: React.FC = () => {
         }, 3000);
     };
 
-    const currentTenant = useMemo(() => tenantsData.find(t => t.id === currentTenantId) || null, [tenantsData, currentTenantId]);
+    const currentTenant = currentTenantData;
     
     // --- DECLARATIVE NOTIFICATION GENERATION ---
     useEffect(() => {
@@ -70,7 +126,8 @@ const App: React.FC = () => {
         thirtyDaysFromNow.setDate(now.getDate() + 30);
 
         // Generate notifications based on the current inventory state
-        currentTenant.inventory.forEach((product: Product) => {
+        if (currentTenant.inventory && Array.isArray(currentTenant.inventory)) {
+            currentTenant.inventory.forEach((product: Product) => {
             // Low stock alert
             if (product.stock <= product.reorderLevel) {
                 activeNotifications.push({
@@ -97,10 +154,11 @@ const App: React.FC = () => {
                     });
                 }
             }
-        });
+            });
+        }
 
         // Preserve read status and creation date from existing notifications
-        const existingNotificationsById = new Map(currentTenant.notifications.map(n => [n.id, n]));
+        const existingNotificationsById = new Map((currentTenant.notifications || []).map(n => [n.id, n]));
         
         const finalNotifications = activeNotifications.map(newNotification => {
             const existing = existingNotificationsById.get(newNotification.id);
@@ -117,7 +175,7 @@ const App: React.FC = () => {
         });
 
         // Compare with current notifications to prevent infinite render loops
-        const currentNotifString = JSON.stringify(currentTenant.notifications.map(n => ({id: n.id, message: n.message})).sort((a,b) => a.id.localeCompare(b.id)));
+        const currentNotifString = JSON.stringify((currentTenant.notifications || []).map(n => ({id: n.id, message: n.message})).sort((a,b) => a.id.localeCompare(b.id)));
         const finalNotifString = JSON.stringify(finalNotifications.map(n => ({id: n.id, message: n.message})).sort((a,b) => a.id.localeCompare(b.id)));
         
         if (currentNotifString !== finalNotifString) {
@@ -136,12 +194,24 @@ const App: React.FC = () => {
     }), [tenantsData, currentTenant, setCurrentTenantId, updateTenantData, addToast]);
     
 
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-rose-pink mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <DataContext.Provider value={contextValue}>
             <HashRouter>
                 <div className="min-h-screen font-sans">
                     <Routes>
                         <Route path="/" element={!currentTenantId ? <LandingPage /> : <Navigate to="/dashboard" />} />
+                        <Route path="/signin" element={!currentTenantId ? <SignInPage /> : <Navigate to="/dashboard" />} />
                         <Route 
                             path="/dashboard" 
                             element={currentTenantId ? <DashboardLayout /> : <Navigate to="/" />}

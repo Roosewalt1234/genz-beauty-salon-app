@@ -113,7 +113,7 @@ export interface Staff {
   role: StaffRole;
   yearsOfExperience?: number;
   commission?: number;
-  profileImageUrl?: string;
+  profile_image_url?: string;
   rating?: number;
   bio?: string;
   specializations: string[];

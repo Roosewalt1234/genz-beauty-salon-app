@@ -1,0 +1,10 @@
+{
+  "name": "GenZ Salon - Beauty Salon Management System",
+  "short_name": "GenZ Salon",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#E91E63",
+  "description": "Professional beauty salon management system",
+  "icons": []
+}
