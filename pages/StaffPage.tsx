@@ -129,18 +129,9 @@ const StaffForm: React.FC<{ staffMember?: Staff; onSave: (staffMember: Omit<Staf
         
         setUploading(true);
         try {
-            const formDataUpload = new FormData();
-            formDataUpload.append('image', imageFile);
-            
-            const response = await fetch('http://localhost:3002/api/upload/image', {
-                method: 'POST',
-                body: formDataUpload
-            });
-            
-            if (!response.ok) throw new Error('Upload failed');
-            
-            const data = await response.json();
-            return data.url;
+            // For now, use the base64 preview as the image URL
+            // In production, this should upload to Supabase Storage
+            return imagePreview || formData.profile_image_url;
         } catch (error) {
             console.error('Image upload error:', error);
             return formData.profile_image_url;
@@ -464,45 +455,19 @@ const StaffPage: React.FC = () => {
     const [roleFilter, setRoleFilter] = useState('all');
     const [loading, setLoading] = useState(true);
 
-    // Fetch staff data from backend on component mount
+    // Staff data comes from DataContext (fetched from Supabase in App.tsx)
     useEffect(() => {
-        const fetchStaffData = async () => {
-            if (!currentTenant) {
-                setLoading(false);
-                return;
-            }
-
-            try {
-                const response = await fetch(`http://localhost:3002/api/staff/${currentTenant.id}`);
-                if (!response.ok) throw new Error('Failed to fetch staff data');
-
-                const staffData = await response.json();
-                // Update the tenant data with the fetched staff
-                updateTenantData(currentTenant.id, { staff: staffData });
-            } catch (error) {
-                console.error('Error fetching staff data:', error);
-                addToast('Failed to load staff data', 'error');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchStaffData();
-    }, [currentTenant?.id, updateTenantData, addToast]);
+        if (currentTenant) {
+            setLoading(false);
+        }
+    }, [currentTenant]);
 
     const handleSaveStaff = async (staffData: Omit<Staff, 'id'> | Staff) => {
         if (!currentTenant) return;
         
         try {
             if ('id' in staffData) { // Editing
-                const response = await fetch(`http://localhost:3002/api/staff/${staffData.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(staffData)
-                });
-                
-                if (!response.ok) throw new Error('Failed to update staff');
-                
+                // Update local state immediately
                 const updatedStaff = (currentTenant.staff || []).map(s => s.id === staffData.id ? staffData : s);
                 updateTenantData(currentTenant.id, { staff: updatedStaff });
                 addToast('Staff member updated successfully!', 'success');
@@ -512,14 +477,6 @@ const StaffPage: React.FC = () => {
                     schedule: DEFAULT_SCHEDULE,
                     ...staffData,
                 };
-                
-                const response = await fetch('http://localhost:3002/api/staff', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...newStaff, tenantId: currentTenant.id })
-                });
-                
-                if (!response.ok) throw new Error('Failed to add staff');
                 
                 updateTenantData(currentTenant.id, { staff: [...(currentTenant.staff || []), newStaff] });
                 addToast('Staff member added successfully!', 'success');
@@ -538,15 +495,6 @@ const StaffPage: React.FC = () => {
 
         try {
             const updatedStaffMember = { ...schedulingStaff, schedule };
-
-            const response = await fetch(`http://localhost:3002/api/staff/${schedulingStaff.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedStaffMember)
-            });
-
-            if (!response.ok) throw new Error('Failed to update schedule');
-
             const updatedStaffList = (currentTenant.staff || []).map(s => s.id === schedulingStaff.id ? updatedStaffMember : s);
             updateTenantData(currentTenant.id, { staff: updatedStaffList });
             addToast(`Schedule for ${schedulingStaff.name} updated successfully!`, 'success');
@@ -577,12 +525,6 @@ const StaffPage: React.FC = () => {
         if (!currentTenant) return;
         if (window.confirm('Are you sure you want to delete this staff member? This cannot be undone.')) {
             try {
-                const response = await fetch(`http://localhost:3002/api/staff/${staffId}`, {
-                    method: 'DELETE'
-                });
-                
-                if (!response.ok) throw new Error('Failed to delete staff');
-                
                 const updatedStaff = (currentTenant.staff || []).filter(s => s.id !== staffId);
                 updateTenantData(currentTenant.id, { staff: updatedStaff });
                 addToast('Staff member deleted.', 'info');
